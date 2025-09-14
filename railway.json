@@ -1,0 +1,25 @@
+{
+  "services": {
+    "backend": {
+      "build": {
+        "builder": "docker",
+        "dockerfilePath": "back/Dockerfile"
+      },
+      "rootDir": "back",
+      "env": {
+        "PORT": "8000"
+      }
+    },
+    "frontend": {
+      "build": {
+        "builder": "nixpacks",
+        "buildCommand": "npm run build",
+        "startCommand": "npm run preview"
+      },
+      "rootDir": "frontend",
+      "env": {
+        "PORT": "5173"
+      }
+    }
+  }
+}
