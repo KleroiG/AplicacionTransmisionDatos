@@ -1,11 +1,12 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import numpy as np
 import soundfile as sf
 import io
 import os
+from pathlib import Path
 from typing import Optional
 import matplotlib.pyplot as plt
 import tempfile
@@ -21,12 +22,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar archivos estáticos del frontend
-app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
+# Configurar paths - manejo robusto del frontend
+frontend_path = Path("frontend/dist")
+
+# Servir archivos estáticos solo si el frontend existe
+if frontend_path.exists():
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+    print("✓ Frontend estático montado correctamente")
+else:
+    print("⚠️ Frontend no encontrado. Solo API REST disponible")
 
 @app.get("/")
 async def serve_frontend():
-    return FileResponse("frontend/dist/index.html")
+    index_path = frontend_path / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    # Si no hay frontend, mostrar información de la API
+    return JSONResponse({
+        "message": "Backend de Codificación PCM y Modulación PSK funcionando",
+        "status": "success",
+        "api_endpoints": {
+            "process_audio": "POST /api/process-audio",
+            "download_result": "GET /api/download-result",
+            "health_check": "GET /api/health"
+        },
+        "frontend_status": "no_encontrado",
+        "instructions": "Ejecuta 'npm run build' en la carpeta frontend/ para construir el frontend"
+    })
+
+@app.get("/api/health")
+async def health_check():
+    """Endpoint de verificación de salud"""
+    return {
+        "status": "ok", 
+        "service": "Audio PCM-PSK Encoder",
+        "frontend_available": frontend_path.exists(),
+        "endpoints_working": True
+    }
 
 @app.post("/api/process-audio")
 async def process_audio(file: UploadFile = File(...), bit_depth: int = 8, sample_rate: int = 44100):
@@ -63,10 +96,13 @@ async def process_audio(file: UploadFile = File(...), bit_depth: int = 8, sample
             tmp_path = tmp.name
         
         return {
-            "message": "Procesamiento completado",
+            "message": "Procesamiento completado exitosamente",
             "pcm_samples": pcm_encoded[:100].tolist(),  # Muestra de primeros 100 samples
             "psk_waveform": psk_modulated[:100].tolist(),
-            "audio_url": f"/api/download-result?path={tmp_path}"
+            "audio_url": f"/api/download-result?path={tmp_path}",
+            "original_sample_rate": original_sr,
+            "processed_sample_rate": sample_rate,
+            "bit_depth": bit_depth
         }
         
     except Exception as e:
@@ -75,8 +111,13 @@ async def process_audio(file: UploadFile = File(...), bit_depth: int = 8, sample
 @app.get("/api/download-result")
 async def download_result(path: str):
     if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path, media_type='audio/wav', filename="modulated_audio.wav")
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    return FileResponse(
+        path, 
+        media_type='audio/wav', 
+        filename="audio_modulado_psk.wav",
+        headers={"Content-Disposition": "attachment; filename=audio_modulado_psk.wav"}
+    )
 
 def pcm_encoding(audio_data: np.ndarray, bit_depth: int) -> np.ndarray:
     """Codificación PCM del audio"""
