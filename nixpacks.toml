@@ -1,11 +1,10 @@
 [build]
 providers = ["python=3.11", "node=18"]
-baseImage = "node:18-bullseye"
 
 [phases.install]
 cmds = [
     "apt-get update",
-    "apt-get install -y python3 python3-pip python3-dev libsndfile1 ffmpeg"
+    "apt-get install -y python3 python3-pip python3-venv python3-dev nodejs npm build-essential libsndfile1 ffmpeg"
 ]
 
 [phases.setup]
