@@ -1,17 +1,17 @@
 [build]
-providers = ["python=3.11", "node=18"]
-baseImage = "ubuntu:22.04"
+baseImage = "python:3.11-slim-bullseye"
+providers = ["node=18"]
 
 [phases.install]
 cmds = [
     "apt-get update",
-    "apt-get install -y python3-pip python3-venv python3-dev build-essential libsndfile-dev ffmpeg"
+    "apt-get install -y build-essential libsndfile1 ffmpeg"
 ]
 
 [phases.setup]
 cmds = [
-    "python3 -m pip install --upgrade pip",
-    "python3 -m pip install -r back/requirements.txt",
+    "pip install --upgrade pip",
+    "pip install -r back/requirements.txt",
     "cd frontend && npm install"
 ]
 
@@ -21,4 +21,4 @@ cmds = [
 ]
 
 [start]
-cmd = "python3 -m uvicorn back.main:app --host 0.0.0.0 --port $PORT"
+cmd = "uvicorn back.main:app --host 0.0.0.0 --port $PORT"
