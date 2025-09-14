@@ -1,6 +1,17 @@
+[providers]
+python = "3.11"
+node = "18"
+
+[phases.install]
+cmds = [
+  "apt-get update",
+  "apt-get install -y build-essential libsndfile1 python3-dev ffmpeg"
+]
+
 [phases.setup]
 cmds = [
-  "cd back && pip install -r requirements.txt",
+  "pip install --upgrade pip",
+  "pip install -r back/requirements.txt",
   "cd frontend && npm install"
 ]
 
@@ -10,4 +21,4 @@ cmds = [
 ]
 
 [start]
-cmd = "cd back && uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "uvicorn back.main:app --host 0.0.0.0 --port $PORT"
