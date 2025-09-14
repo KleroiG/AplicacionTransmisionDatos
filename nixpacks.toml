@@ -1,12 +1,14 @@
 [build]
 providers = ["python=3.11", "node=18"]
 
+# PRIMERO: Instalar todas las dependencias del sistema
 [phases.install]
 cmds = [
     "apt-get update",
     "apt-get install -y python3 python3-pip python3-venv python3-dev nodejs npm build-essential libsndfile1 ffmpeg"
 ]
 
+# SEGUNDO: Configurar el entorno de Python y Node.js
 [phases.setup]
 cmds = [
     "python3 -m pip install --upgrade pip",
@@ -14,6 +16,7 @@ cmds = [
     "cd frontend && npm install"
 ]
 
+# TERCERO: Build del frontend
 [phases.build]
 cmds = [
     "cd frontend && npm run build"
