@@ -5,20 +5,15 @@ providers = ["python=3.11", "node=18"]
 cmds = [
     # 1. Instalar dependencias del sistema
     "apt-get update",
-    "apt-get install -y python3 python3-pip python3-venv python3-dev nodejs npm build-essential libsndfile1 ffmpeg",
+    "apt-get install -y python3 python3-venv python3-dev nodejs npm build-essential libsndfile1 ffmpeg",
     
-    # 2. Crear y activar virtual environment
-    "python3 -m venv /app/venv",
-    ". /app/venv/bin/activate",
+    # 2. Crear virtual environment e instalar dependencias en UN SOLO COMANDO
+    "python3 -m venv /app/venv && . /app/venv/bin/activate && pip install --upgrade pip && pip install -r back/requirements.txt",
     
-    # 3. Configurar Python (DENTRO del virtual environment)
-    "pip install --upgrade pip",
-    "pip install -r back/requirements.txt",
-    
-    # 4. Configurar Node.js
+    # 3. Configurar Node.js
     "cd frontend && npm install",
     
-    # 5. Build del frontend
+    # 4. Build del frontend
     "cd frontend && npm run build"
 ]
 
