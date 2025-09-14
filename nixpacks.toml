@@ -1,23 +1,22 @@
-[providers]
-python = "3.11"
-node = "18"
+[build]
+providers = ["python=3.11", "node=18"]
 
 [phases.install]
 cmds = [
-  "apt-get update",
-  "apt-get install -y build-essential libsndfile1 python3-dev ffmpeg"
+    "apt-get update",
+    "apt-get install -y build-essential libsndfile1 python3-dev ffmpeg"
 ]
 
 [phases.setup]
 cmds = [
-  "pip install --upgrade pip",
-  "pip install -r back/requirements.txt",
-  "cd frontend && npm install"
+    "pip install --upgrade pip",
+    "pip install -r back/requirements.txt",
+    "cd frontend && npm install"
 ]
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build"
+    "cd frontend && npm run build"
 ]
 
 [start]
