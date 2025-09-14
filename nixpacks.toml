@@ -1,11 +1,17 @@
 [build]
-baseImage = "python:3.11"
-providers = ["node=18"]
+providers = ["python=3.11", "node=18"]
+baseImage = "node:18-bullseye"
+
+[phases.install]
+cmds = [
+    "apt-get update",
+    "apt-get install -y python3 python3-pip python3-dev libsndfile1 ffmpeg"
+]
 
 [phases.setup]
 cmds = [
-    "apt-get update && apt-get install -y libsndfile1",
-    "pip install -r back/requirements.txt",
+    "python3 -m pip install --upgrade pip",
+    "python3 -m pip install -r back/requirements.txt",
     "cd frontend && npm install"
 ]
 
@@ -15,4 +21,4 @@ cmds = [
 ]
 
 [start]
-cmd = "uvicorn back.main:app --host 0.0.0.0 --port $PORT"
+cmd = "python3 -m uvicorn back.main:app --host 0.0.0.0 --port $PORT"
