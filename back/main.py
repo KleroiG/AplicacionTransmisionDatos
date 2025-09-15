@@ -23,16 +23,14 @@ app.add_middleware(
 )
 
 # Configurar paths - manejo robusto del frontend
-frontend_path = Path("frontend/dist")
+frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
 
-# Servir archivos estáticos solo si el frontend existe
 if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
     print("✓ Frontend estático montado correctamente")
 else:
-    print("⚠️ Frontend no encontrado. Solo API REST disponible")
+    print("⚠️ Frontend no encontrado")
 
-@app.get("/")
 async def serve_frontend():
     index_path = frontend_path / "index.html"
     if index_path.exists():
