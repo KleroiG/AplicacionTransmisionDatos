@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Form
 import numpy as np
 import soundfile as sf
 import io
@@ -27,9 +28,9 @@ frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
 
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
-    print("✓ Frontend estático montado correctamente")
+    print("Frontend estático montado correctamente")
 else:
-    print("⚠️ Frontend no encontrado")
+    print("Frontend no encontrado")
 
 async def serve_frontend():
     index_path = frontend_path / "index.html"
@@ -60,7 +61,7 @@ async def health_check():
     }
 
 @app.post("/api/process-audio")
-async def process_audio(file: UploadFile = File(...), bit_depth: int = 8, sample_rate: int = 44100):
+async def process_audio(file: UploadFile = File(...), bit_depth: int = Form(8), sample_rate: int = Form(44100)):
     try:
         # Leer el archivo de audio
         audio_data, original_sr = sf.read(io.BytesIO(await file.read()))
