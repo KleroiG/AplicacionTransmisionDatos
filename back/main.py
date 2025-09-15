@@ -27,8 +27,8 @@ app.add_middleware(
 frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
 
 if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
-    print("Frontend estático montado correctamente")
+    app.mount("/app", StaticFiles(directory=frontend_path, html=True), name="frontend")
+    print("Frontend estático montado en /app")
 else:
     print("Frontend no encontrado")
 
