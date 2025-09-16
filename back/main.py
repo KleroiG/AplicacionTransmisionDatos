@@ -63,6 +63,18 @@ async def health_check():
 @app.post("/api/process-audio")
 async def process_audio(file: UploadFile = File(...), bit_depth: int = Form(8), sample_rate: int = Form(44100)):
     try:
+        print(f"Procesando archivo: {file.filename}, bit_depth={bit_depth}, sample_rate={sample_rate}")
+
+        audio_bytes = await file.read()
+        print(f"Tamaño del archivo recibido: {len(audio_bytes)} bytes")
+
+        audio_data, original_sr = sf.read(io.BytesIO(audio_bytes))
+        print(f"Archivo leído con sample_rate original: {original_sr}, forma: {audio_data.shape}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+    try:
         # Leer el archivo de audio
         audio_data, original_sr = sf.read(io.BytesIO(await file.read()))
         
