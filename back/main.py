@@ -68,14 +68,34 @@ async def process_audio(
     sample_rate: int = Form(44100)
 ):
     try:
-        print(f"Procesando archivo: {file.filename}, bit_depth={bit_depth}, sample_rate={sample_rate}")
+        # ✅ Validar extensión
+        allowed_extensions = {".wav", ".mp3", ".flac", ".ogg"}
+        ext = Path(file.filename).suffix.lower()
+        if ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Formato de archivo no soportado ({ext}). "
+                       f"Formatos permitidos: {', '.join(allowed_extensions)}"
+            )
 
-        # Leer bytes del archivo UNA sola vez
+        # ✅ Validar tamaño (20 MB máx)
+        max_size = 20 * 1024 * 1024
         audio_bytes = await file.read()
+        if len(audio_bytes) > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"El archivo excede el tamaño máximo permitido (20 MB)"
+            )
+
+        print(f"Procesando archivo: {file.filename}, bit_depth={bit_depth}, sample_rate={sample_rate}")
         print(f"Tamaño del archivo recibido: {len(audio_bytes)} bytes")
 
         # Leer con soundfile
-        audio_data, original_sr = sf.read(io.BytesIO(audio_bytes))
+        try:
+            audio_data, original_sr = sf.read(io.BytesIO(audio_bytes))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"No se pudo leer el audio: {str(e)}")
+
         print(f"Archivo leído con sample_rate original: {original_sr}, forma: {audio_data.shape}")
 
         # Convertir a mono si es estéreo
@@ -106,7 +126,6 @@ async def process_audio(
             carrier = np.sin(2 * np.pi * 1000 * time)
             modulated_signal = carrier * psk_modulated
 
-            # Normalizar y guardar
             modulated_signal = modulated_signal / np.max(np.abs(modulated_signal))
             sf.write(tmp.name, modulated_signal, sample_rate)
             tmp_path = tmp.name
@@ -114,7 +133,7 @@ async def process_audio(
 
         return {
             "message": "Procesamiento completado exitosamente",
-            "pcm_samples": pcm_encoded[:100].tolist(),  # muestra
+            "pcm_samples": pcm_encoded[:100].tolist(),
             "psk_waveform": psk_modulated[:100].tolist(),
             "audio_url": f"/api/download-result?path={tmp_path}",
             "original_sample_rate": original_sr,
@@ -122,11 +141,13 @@ async def process_audio(
             "bit_depth": bit_depth
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         print("❌ ERROR en process_audio:", str(e))
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno procesando audio: {str(e)}")
 
 
 @app.get("/api/download-result")
