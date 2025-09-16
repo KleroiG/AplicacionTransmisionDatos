@@ -60,64 +60,74 @@ async def health_check():
         "endpoints_working": True
     }
 
+
 @app.post("/api/process-audio")
-async def process_audio(file: UploadFile = File(...), bit_depth: int = Form(8), sample_rate: int = Form(44100)):
+async def process_audio(
+    file: UploadFile = File(...),
+    bit_depth: int = Form(8),
+    sample_rate: int = Form(44100)
+):
     try:
         print(f"Procesando archivo: {file.filename}, bit_depth={bit_depth}, sample_rate={sample_rate}")
 
+        # Leer bytes del archivo UNA sola vez
         audio_bytes = await file.read()
         print(f"Tamaño del archivo recibido: {len(audio_bytes)} bytes")
 
+        # Leer con soundfile
         audio_data, original_sr = sf.read(io.BytesIO(audio_bytes))
         print(f"Archivo leído con sample_rate original: {original_sr}, forma: {audio_data.shape}")
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
-    try:
-        # Leer el archivo de audio
-        audio_data, original_sr = sf.read(io.BytesIO(await file.read()))
-        
+
         # Convertir a mono si es estéreo
         if len(audio_data.shape) > 1:
+            print("Audio estéreo detectado → convirtiendo a mono")
             audio_data = np.mean(audio_data, axis=1)
-        
+
         # Resamplear si es necesario
         if original_sr != sample_rate:
             from scipy import signal
             num_samples = int(len(audio_data) * sample_rate / original_sr)
+            print(f"Resampleando de {original_sr} Hz a {sample_rate} Hz ({num_samples} muestras)")
             audio_data = signal.resample(audio_data, num_samples)
-        
+
         # Codificación PCM
+        print("Iniciando codificación PCM…")
         pcm_encoded = pcm_encoding(audio_data, bit_depth)
-        
+        print("Codificación PCM completada")
+
         # Modulación PSK
+        print("Iniciando modulación PSK…")
         psk_modulated = psk_modulation(pcm_encoded)
-        
+        print("Modulación PSK completada")
+
         # Guardar resultados temporales
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp:
-            # Crear señal de audio para la modulación PSK (simulada)
-            time = np.linspace(0, len(psk_modulated)/1000, len(psk_modulated))
+            time = np.linspace(0, len(psk_modulated) / 1000, len(psk_modulated))
             carrier = np.sin(2 * np.pi * 1000 * time)
             modulated_signal = carrier * psk_modulated
-            
+
             # Normalizar y guardar
             modulated_signal = modulated_signal / np.max(np.abs(modulated_signal))
             sf.write(tmp.name, modulated_signal, sample_rate)
             tmp_path = tmp.name
-        
+            print(f"Archivo modulado guardado en {tmp_path}")
+
         return {
             "message": "Procesamiento completado exitosamente",
-            "pcm_samples": pcm_encoded[:100].tolist(),  # Muestra de primeros 100 samples
+            "pcm_samples": pcm_encoded[:100].tolist(),  # muestra
             "psk_waveform": psk_modulated[:100].tolist(),
             "audio_url": f"/api/download-result?path={tmp_path}",
             "original_sample_rate": original_sr,
             "processed_sample_rate": sample_rate,
             "bit_depth": bit_depth
         }
-        
+
     except Exception as e:
+        import traceback
+        print("❌ ERROR en process_audio:", str(e))
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+
 
 @app.get("/api/download-result")
 async def download_result(path: str):
