@@ -1,4 +1,5 @@
 FROM python:3.11-slim
+
 WORKDIR /app
 
 # librerías del sistema necesarias (libsndfile para soundfile, build tools)
@@ -9,6 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # copiar e instalar requirements
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copiar código
