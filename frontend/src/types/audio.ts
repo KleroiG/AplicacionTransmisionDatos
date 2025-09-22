@@ -6,7 +6,11 @@ export interface AudioProcessingResponse {
 }
 
 export interface ProcessingResults {
+  audio_data: number[];
   pcmData: number[];
   pskData: number[];
+  binary_data: number[];
+  polar_data: number[];
+  carrier: number[];
   audioUrl: string;
 }

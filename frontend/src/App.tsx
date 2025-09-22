@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ProcessingResults } from './types/audio';
 import './App.css';
+import "./Modal";
+import Modal from "./Modal";
+import MiniWaveform from "./MiniWaveform";
+
+
 
 const AudioProcessor: React.FC = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -12,6 +17,13 @@ const AudioProcessor: React.FC = () => {
 
   const pcmCanvasRef = useRef<HTMLCanvasElement>(null);
   const pskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCanvasRef = useRef<HTMLCanvasElement>(null);
+  const binaryDataCanvasRef = useRef<HTMLCanvasElement>(null);
+  const polarDataCanvasRef = useRef<HTMLCanvasElement>(null);
+  const carrierCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showPolarModal, setShowPolarModal] = useState(false);
+  const [showPCMModal, setShowPCMModal] = useState(false);
+  const [showPSKModal, setShowPSKModal] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -61,9 +73,14 @@ const AudioProcessor: React.FC = () => {
       const data = await response.json();
 
       setResults({
+        audio_data: data.audio_data,
         pcmData: data.pcm_samples,
         pskData: data.psk_waveform,
+        binary_data: data.binary_data,
+        polar_data: data.polar_data,
+        carrier: data.carrier,
         audioUrl: data.audio_url,
+
       });
 
     } catch (err) {
@@ -75,33 +92,43 @@ const AudioProcessor: React.FC = () => {
   };
 
   const drawWaveform = (
-    canvas: HTMLCanvasElement,
-    data: number[],
-    color: string
-  ): void => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx || data.length === 0) return;
+  canvas: HTMLCanvasElement,
+  data: number[],
+  color: string
+): void => {
+  const ctx = canvas.getContext("2d");
+  if (!ctx || data.length === 0) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
 
-    const step = canvas.width / data.length;
-    const mid = canvas.height / 2;
-    const maxAmplitude = Math.max(...data.map(Math.abs), 1);
+  const step = Math.ceil(data.length / canvas.width); 
+  const mid = canvas.height / 2;
 
+  if (canvas.id === "binary" || canvas.id === "polar") {
+    for (let i = 0; i < data.length; i += step) {
+      const x = (i / step) * (canvas.width / (data.length / step));
+      const y = mid - data[i] * (mid - 20); 
+      ctx.lineTo(x, y);
+      ctx.lineTo(
+        x + canvas.width / (data.length / step),
+        y
+      ); 
+    }
+  } else {
     ctx.moveTo(0, mid);
-
-    for (let i = 0; i < data.length; i++) {
-      const x = i * step;
-      const y = mid - (data[i] * (mid - 10) / maxAmplitude);
+    for (let i = 0; i < data.length; i += step) {
+      const x = (i / step) * (canvas.width / (data.length / step));
+      const y = mid - (data[i] * (mid - 10)) / Math.max(...data.map(Math.abs), 1);
       ctx.lineTo(x, y);
     }
+  }
 
-    ctx.stroke();
-  };
+  ctx.stroke();
+};
+
 
   const drawWaveforms = () => {
     if (!results) return;
@@ -113,6 +140,22 @@ const AudioProcessor: React.FC = () => {
     if (pskCanvasRef.current) {
       drawWaveform(pskCanvasRef.current, results.pskData, '#e74c3c');
     }
+
+    if (audioCanvasRef.current) {
+      drawWaveform(audioCanvasRef.current, results.audio_data, '#b13ce7ff');
+    }
+
+    if (binaryDataCanvasRef.current) {
+      drawWaveform(binaryDataCanvasRef.current, results.binary_data, '#e73caeff');
+    }
+
+    if (polarDataCanvasRef.current) {
+      drawWaveform(polarDataCanvasRef.current, results.polar_data, '#5ee73cff');
+    }
+
+    if (carrierCanvasRef.current) {
+      drawWaveform(carrierCanvasRef.current, results.carrier, '#d0e73cff');
+    }
   };
 
   useEffect(() => {
@@ -122,14 +165,20 @@ const AudioProcessor: React.FC = () => {
   return (
     <div className="container">
       <h1>Codificador PCM y Modulador PSK</h1>
-
       <div className="upload-section">
-        <input
-          type="file"
-          onChange={handleFileUpload}
-          accept="audio/*"
-          className="file-input"
-        />
+        <div className="file-input-wrapper">
+          <input
+            type="file"
+            id="file-upload"
+            className="file-input"
+            onChange={handleFileUpload}
+            accept="audio/*"
+          />
+          <label htmlFor="file-upload" className="file-label">
+            📂 Seleccionar archivo
+          </label>
+          {audioFile && <p className="file-name">Archivo: {audioFile.name}</p>}
+        </div>
 
         <div className="controls">
           <div className="control-group">
@@ -173,16 +222,50 @@ const AudioProcessor: React.FC = () => {
         <div className="results-section">
           <h2>Resultados del Procesamiento</h2>
 
+          <div className="diagram">
+            <MiniWaveform data={results.audio_data} color="#8e44ad" type="line"/>
+            <div className="diagram-step" onClick={() => setShowPCMModal(true)} >PCM</div>
+
+            <MiniWaveform data={results.pcmData} color="#3498db" type="line" />
+            <div className="diagram-step cursor-pointer" onClick={() => setShowPolarModal(true)} >Polar</div>
+
+            <MiniWaveform data={results.polar_data} color="#22e64dff" type="step"/>
+            <div className="diagram-step" onClick={() => setShowPSKModal(true)}>PSK</div>
+
+            <MiniWaveform data={results.pskData} color="#e74c3c" type="line" />
+          </div>
           <div className="waveforms">
+
+            <div className="waveform-card">
+              <h3>Señal Original</h3>
+              <canvas ref={audioCanvasRef} width={500} height={250} />
+            </div>
+
             <div className="waveform-card">
               <h3>Muestra de Codificación PCM</h3>
               <canvas ref={pcmCanvasRef} width={500} height={250} />
             </div>
 
             <div className="waveform-card">
+              <h3>Señal entra a polar</h3>
+              <canvas ref={binaryDataCanvasRef} width={500} height={250} />
+            </div>
+
+            <div className="waveform-card">
+              <h3>Señal sale de polar</h3>
+              <canvas id="polar" ref={polarDataCanvasRef} width={500} height={250} />
+            </div>
+
+            <div className="waveform-card">
               <h3>Señal PSK Modulada</h3>
               <canvas ref={pskCanvasRef} width={500} height={250} />
             </div>
+
+            <div className="waveform-card">
+              <h3>Carrier</h3>
+              <canvas ref={carrierCanvasRef} width={500} height={250} />
+            </div>
+
           </div>
 
           <div className="audio-player">
@@ -202,6 +285,105 @@ const AudioProcessor: React.FC = () => {
           </div>
         </div>
       )}
+
+
+      <Modal show={showPolarModal} onClose={() => setShowPolarModal(false)}>
+      <h2 className="text-xl font-bold mb-4">Señales en Polar → PSK</h2>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3>No cuenta con portadora.</h3>
+        </div>
+        <div>
+          <h3>Señal Moduladora</h3>
+          <MiniWaveform
+            data={results?.polar_data || []}
+            color="#e74c3c"
+            type="line"
+            width={500}
+            height={200}
+          />
+        </div>
+        <div>
+          <h3>Señal Modulada</h3>
+          <MiniWaveform
+            data={results?.polar_data || []}
+            color="#3ce753ff"
+            type="line"
+            width={500}
+            height={200}
+          />
+          
+        </div>
+      </div>
+    </Modal>
+
+    <Modal show={showPCMModal} onClose={() => setShowPCMModal(false)}>
+      <h2 className="text-xl font-bold mb-4">Señal Original → PCM</h2>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3>No cuenta con portadora. </h3>
+          
+        </div>
+        <div>
+          <h3>Señal Moduladora</h3>
+          <MiniWaveform
+            data={results?.audio_data || []}
+            color="#e74c3c"
+            type="line"
+            width={500}
+            height={200}
+          />
+        </div>
+        <div>
+          <h3>Señal Modulada</h3>
+          <MiniWaveform
+            data={results?.pcmData || []}
+            color="#3ce7abff"
+            type="line"
+            width={500}
+            height={200}
+          />
+        </div>
+      </div>
+    </Modal>
+
+    <Modal show={showPSKModal} onClose={() => setShowPSKModal(false)}>
+      <h2 className="text-xl font-bold mb-4">Señal Polar → PSK</h2>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3>Señal Portadora</h3>
+          <MiniWaveform
+            data={results?.carrier || []}
+            color="#e74c3c"
+            type="line"
+            width={500}
+            height={200}
+          />
+          
+        </div>
+        <div>
+          <h3>Señal Moduladora</h3>
+          <MiniWaveform
+            data={results?.polar_data || []}
+            color="#e74c3c"
+            type="line"
+            width={500}
+            height={200}
+          />
+        </div>
+        <div>
+          <h3>Señal Modulada</h3>
+          <MiniWaveform
+            data={results?.pskData || []}
+            color="#3ce7abff"
+            type="line"
+            width={500}
+            height={200}
+          />
+        </div>
+      </div>
+    </Modal>
+
     </div>
   );
 };
