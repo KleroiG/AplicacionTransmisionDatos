@@ -20,27 +20,47 @@ def pcm_psk_process(file_bytes, nbits=8, fc=2000, sps=16):
 
     # --- Modulación BPSK ---
     symbols = 2*bits - 1
-    tx = np.repeat(symbols, sps)
+    tx = np.repeat(symbols, sps)        # señal moduladora (banda base)
     fs_tx = fs * sps
     t_tx = np.arange(len(tx)) / fs_tx
-    carrier = np.cos(2*np.pi*fc*t_tx)
-    tx_passband = tx * carrier
+    carrier = np.cos(2*np.pi*fc*t_tx)   # señal portadora
+    tx_passband = tx * carrier          # señal modulada BPSK
 
     # Guardar audio modulado en buffer
     wav_buf = BytesIO()
     sf.write(wav_buf, tx_passband, fs_tx, format="WAV")
     wav_buf.seek(0)
 
-    # Gráfico de señal modulada
-    plt.figure(figsize=(8,3))
+    # --- Gráfico comparativo ---
+    img_buf = BytesIO()
+    plt.figure(figsize=(10,6))
+
+    plt.subplot(3,1,1)
+    plt.plot(t_tx[:500], carrier[:500])
+    plt.title("Portadora (coseno)")
+    plt.ylabel("Amplitud")
+
+    plt.subplot(3,1,2)
+    plt.plot(t_tx[:500], tx[:500])
+    plt.title("Señal moduladora (bits en banda base)")
+    plt.ylabel("Nivel")
+
+    plt.subplot(3,1,3)
     plt.plot(t_tx[:500], tx_passband[:500])
-    plt.title("Señal modulada BPSK (primeros 500 samples)")
+    plt.title("Señal modulada BPSK")
     plt.xlabel("Tiempo [s]")
     plt.ylabel("Amplitud")
+
     plt.tight_layout()
-    img_buf = BytesIO()
     plt.savefig(img_buf, format="png")
     plt.close()
     img_buf.seek(0)
 
-    return wav_buf, img_buf
+    # Retornar audio + señales
+    return {
+        "wav_buf": wav_buf,
+        "img_buf": img_buf,
+        "carrier": carrier[:1000].tolist(),     # portadora (trozo para graficar)
+        "moduladora": tx[:1000].tolist(),       # señal moduladora
+        "modulada": tx_passband[:1000].tolist() # señal modulada
+    }

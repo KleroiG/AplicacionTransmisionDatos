@@ -103,21 +103,22 @@ async def process_audio(
             print("Audio estéreo detectado → convirtiendo a mono")
             audio_data = np.mean(audio_data, axis=1)
 
-        # Resamplear si es necesario
+        if len(audio_data.shape) > 1:
+            print("Audio estéreo detectado → convirtiendo a mono")
+            audio_data = np.mean(audio_data, axis=1)
+
         if original_sr != sample_rate:
             from scipy import signal
             num_samples = int(len(audio_data) * sample_rate / original_sr)
             print(f"Resampleando de {original_sr} Hz a {sample_rate} Hz ({num_samples} muestras)")
             audio_data = signal.resample(audio_data, num_samples)
 
-        # Codificación PCM
         print("Iniciando codificación PCM…")
         pcm_encoded = pcm_encoding(audio_data, bit_depth)
         print("Codificación PCM completada")
 
-        # Modulación PSK
         print("Iniciando modulación PSK…")
-        psk_modulated = psk_modulation(pcm_encoded)
+        binary_data, polar_data, psk_modulated, carrier = psk_modulation(pcm_encoded)
         print("Modulación PSK completada")
 
         # Guardar resultados temporales
@@ -131,10 +132,42 @@ async def process_audio(
             tmp_path = tmp.name
             print(f"Archivo modulado guardado en {tmp_path}")
 
+        num_points = 1000  # cantidad de puntos para graficar
+
+        # Original
+        indices_original = np.linspace(0, len(audio_data) - 1, num_points, dtype=int)
+        original_downsampled = audio_data[indices_original]
+
+        # PCM
+        indices_pcm = np.linspace(0, len(pcm_encoded) - 1, num_points, dtype=int)
+        pcm_downsampled = pcm_encoded[indices_pcm]
+
+        # PSK
+        num_points_psk = 100
+        indices_psk = np.linspace(0, len(psk_modulated) - 1, num_points_psk, dtype=int)
+        psk_downsampled = psk_modulated[indices_psk]
+
+        #binary
+        indices_binary = np.linspace(0, len(binary_data) - 1, num_points_psk, dtype=int)
+        binary_downsampled = binary_data[indices_binary]
+
+        #polar
+        indices_polar = np.linspace(0, len(polar_data) - 1, num_points_psk, dtype=int)
+        polar_downsampled = polar_data[indices_polar]
+
+        carrier_index = np.linspace(0, len(carrier) - 1, num_points_psk, dtype=int)
+        carrier_downsampled = carrier[carrier_index]
+
         return {
             "message": "Procesamiento completado exitosamente",
-            "pcm_samples": pcm_encoded[:100].tolist(),
-            "psk_waveform": psk_modulated[:100].tolist(),
+            "audio_data": original_downsampled.tolist(),    
+            "pcm_samples": pcm_downsampled.tolist(),       
+            "psk_waveform": psk_downsampled.tolist(),
+            "binary_data": binary_downsampled.tolist(), 
+            "polar_data": polar_downsampled.tolist(), 
+            "carrier": carrier_downsampled.tolist(),
+
+            
             "audio_url": f"/api/download-result?path={tmp_path}",
             "original_sample_rate": original_sr,
             "processed_sample_rate": sample_rate,
@@ -173,15 +206,21 @@ def pcm_encoding(audio_data: np.ndarray, bit_depth: int) -> np.ndarray:
     # Convertir a enteros
     return quantized.astype(np.int16)
 
-def psk_modulation(pcm_data: np.ndarray) -> np.ndarray:
-    """Modulación PSK (Phase Shift Keying)"""
-    # Convertir datos PCM a binario
-    binary_data = np.unpackbits(np.uint8(pcm_data + 128))
-    
-    # Modulación PSK: 0 = 0°, 1 = 180°
-    modulated = np.where(binary_data == 1, 1.0, -1.0)
-    
-    return modulated
+def psk_modulation(pcm_data: np.ndarray):
+    """Codificación Polar + Modulación PSK"""
+    # Binario crudo
+    binary_data = np.unpackbits(np.uint8(pcm_data + 128))  
+
+    # Código polar (0→-1, 1→+1)
+    polar_data = np.where(binary_data == 1, 1.0, -1.0)
+
+    # Señal PSK: multiplicar portadora
+    sample_rate = 44100
+    t = np.linspace(0, len(polar_data) / sample_rate, num=len(polar_data))
+    carrier = np.sin(2 * np.pi * 1000 * t)
+    modulated = polar_data * carrier
+
+    return binary_data, polar_data, modulated, carrier
 
 if __name__ == "__main__":
     import uvicorn
